@@ -718,9 +718,11 @@ class Number:
     def is_true(self):
         return self.value != 0
 
-#######################################
-# CONTEXT
-#######################################
+
+
+################################################
+# Context
+################################################
 
 class Context:
     def __init__(self, display_name, parent=None, parent_entry_pos=None):
