@@ -123,7 +123,11 @@ KEYWORDS = [
     'IF', #
     'THEN', #
     'ELIF',
-    'ELSE'
+    'ELSE',
+    'FOR',
+    'TO', 
+    'STEP',
+    'WHILE'
 ]
 
 class Token:
@@ -344,6 +348,26 @@ class IfNode:
         self.pos_start = self.cases[0][0].pos_start
         self.pos_end = (self.else_case or self.cases[len(self.cases) - 1][0]).pos_end
 
+class ForNode:
+    def __init__(self, var_name_tok, start_value_node, end_value_node, step_value_node, body_node):
+        self.var_name_tok = var_name_tok
+        self.start_value_node = start_value_node
+        self.end_value_node = end_value_node
+        self.step_value_node = step_value_node
+        self.body_node = body_node
+
+        self.pos_start = self.var_name_tok.pos_start
+        self.pos_end = self.body_node.pos_end
+
+class WhileNode:
+    def __init__(self, condition_node, body_node):
+        self.condition_node = condition_node
+        self.body_node = body_node
+
+        self.pos_start = self.condition_node.pos_start
+        self.pos_end = self.body_node.pos_end
+
+
 #######################################
 # PARSE RESULT
 #######################################
@@ -457,7 +481,38 @@ class Parser:
 
         return res.success(IfNode(cases, else_case))
 
-            
+    def for_expr(self):
+        res = ParseResult()
+        step_count = None
+
+        if not self.current_tok.matches(TT_KEYWORD, 'FOR'):
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected 'FOR'"))
+        res.register_advancement()
+        self.advance()
+        if not self.current_tok.type == TT_IDENTIFIER:
+            return res.failure(self.current_tok.pos_start, self.current_tok.pos_end, "Expected identifier")
+        var_name = self.current_tok
+        res.register_advancement()
+        self.advance()
+        if not self.current_tok.type == TT_EQ:
+            return res.failure(self.current_tok.pos_start, self.current_tok.pos_end, "Expected '=='")
+        res.register_advancement()
+        self.advance()
+        start_value = res.register(self.expr)
+        if res.error: return res
+        res.register_advancement()
+        res.advance()
+
+        if not self.current_tok.matches(TT_KEYWORD, 'TO'):
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected 'TO'"))
+        res.register_advancement()
+        self.advance()
+        end_value = res.register(self.expr())
+        if res.failure: return res
+        
+
+
+        
             
 
         
@@ -495,6 +550,16 @@ class Parser:
             if_expr = res.register(self.if_expr())
             if res.error: return res
             return res.success(if_expr)
+
+        elif tok.matches(TT_KEYWORD, "FOR"):
+            for_expr = res.register(self.for_expr())
+            if res.error: return res
+            return res.success(for_expr)
+        elif tok.matches(TT_KEYWORD, "WHILE"):
+            for_loop = res.register(self.while_expr())
+            if res.error: return res
+            return res.success(while_expr)
+
         
         return res.failure(InvalidSyntaxError(
             tok.pos_start, tok.pos_end,
