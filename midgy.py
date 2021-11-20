@@ -251,8 +251,11 @@ class Lexer:
         }
         self.advance()
         while self.current_char != None and self.current_char != '"' or escape_char:
+            if not isinstance(self.current_char, str):
+                self.current_char = str(self.current_char)
+
             if escape_char:
-                string += escape_characters.get(str(self.current_char), str(self.current_char))
+                string += escape_characters.get(self.current_char, self.current_char)
             else:
                 if self.current_char == '\\':
                     escape_char = True
