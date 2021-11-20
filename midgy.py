@@ -252,14 +252,14 @@ class Lexer:
         self.advance()
         while self.current_char != None and self.current_char != '"' or escape_char:
             if escape_char:
-                string += escape_characters.get(str(self.current_char), str(self.current_char))
+                string += escape_characters.get(self.current_char, self.current_char)
+                escape_char = False
             else:
                 if self.current_char == '\\':
                     escape_char = True
                 else:
-                    string += str(self.current_char)
+                    string += self.current_char
             self.advance()
-            escape_char = False
         self.advance()
         return Token(TT_STRING,string, pos_start, pos_end=self.pos )
 
@@ -1313,7 +1313,14 @@ class Interpreter:
         if res.error: return res
 
         if node.op_tok.type == TT_PLUS:
-            result, error = left.added_to(right)
+            if isinstance(left, String) and isinstance(right, Number):
+                new_string = String(str(right.value))
+                result, error = left.added_to(new_string)
+            elif isinstance(left, Number) and isinstance(right, String):
+                left_string = String(str(left.value))
+                result, error = left_string.added_to(right)
+            else:
+                result, error = left.added_to(right)
         elif node.op_tok.type == TT_MINUS:
             result, error = left.subbed_by(right)
         elif node.op_tok.type == TT_MUL:
@@ -1473,6 +1480,7 @@ def run(fn, text):
     if error: return None, error
     
     # Generate AST
+    print(tokens)
     parser = Parser(tokens)
     ast = parser.parse()
     if ast.error: return None, ast.error
