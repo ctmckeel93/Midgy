@@ -1186,6 +1186,8 @@ class Number(Value):
     def added_to(self, other):
         if isinstance(other, Number):
             return Number(self.value + other.value).set_context(self.context), None
+        elif isinstance(other, String):
+            return String(str(self.value) + other.value )
         else:
             return None, Value.illegal_operation(self, other)
 
@@ -1292,6 +1294,8 @@ class String(Value):
     def added_to(self, other):
         if isinstance(other, String):
             return String(self.value + other.value).set_context(self.context), None
+        elif isinstance(other,Number):
+            return String(self.value + str(other.value)).set_context(self.context), None
         else:
             return None, Value.illegal_operation(self, other)
 
@@ -1321,7 +1325,8 @@ class List(Value):
 
     def added_to(self, other):
         new_list = self.copy()
-        new_list.elements.append(other)
+        for element_node in other.elements:
+            new_list.elements.append(element_node.value)
         return new_list, None
 
     def subbed_by(self, other):
@@ -1605,7 +1610,7 @@ class Interpreter:
 
         start_value = res.register(self.visit(node.start_value_node, context))
         if res.error:
-            return res
+            return res.error
 
         end_value = res.register(self.visit(node.end_value_node, context))
         if res.error:
