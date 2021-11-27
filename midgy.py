@@ -1285,6 +1285,10 @@ class Number(Value):
     def __repr__(self):
         return str(self.value)
 
+Number.null = Number(0)
+Number.false = Number(0)
+Number.true = Number(1)
+
 
 class String(Value):
     def __init__(self, value):
@@ -1325,8 +1329,7 @@ class List(Value):
 
     def added_to(self, other):
         new_list = self.copy()
-        for element_node in other.elements:
-            new_list.elements.append(element_node.value)
+        new_list.elements.extend(other.elements)
         return new_list, None
 
     def subbed_by(self, other):
@@ -1347,7 +1350,7 @@ class List(Value):
     def multed_by(self, other):
         if isinstance(other, List):
             new_list = self.copy()
-            new_list.elements.extend(other.elements)
+            new_list.elements.append(other.elements)
             return new_list, None
         else:
             return None, Value.illegal_operation(self, other)
@@ -1374,24 +1377,23 @@ class List(Value):
     def __repr__(self):
         return f'[{", ".join([str(x) for x in self.elements])}]'
 
-
-class Function(Value):
-    def __init__(self, name, body_node, arg_names):
+class BaseFunction(Value):
+    def __init__(self,name):
         super().__init__()
         self.name = name or "<anonymous>"
-        self.body_node = body_node
-        self.arg_names = arg_names
 
-    def execute(self, args):
-        res = RTResult()
-        interpreter = Interpreter()
+    def generate_new_context(self):
         new_context = Context(self.name, self.context, self.pos_start)
         new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
+        return new_context
 
-        if len(args) > len(self.arg_names):
+    def check_args(self,arg_names, args):
+        res = RTResult()
+
+        if len(args) > len(arg_names):
             return res.failure(RTError(
                 self.pos_start, self.pos_end,
-                f"{len(args) - len(self.arg_names)} too many args passed into '{self.name}'",
+                f"{len(args) - len(arg_names)} too many args passed into '{self.name}'",
                 self.context
             ))
 
@@ -1402,11 +1404,40 @@ class Function(Value):
                 self.context
             ))
 
+        return res.success(None)
+
+    def populate_args(self, arg_names, args, exec_ctx):
+
         for i in range(len(args)):
-            arg_name = self.arg_names[i]
+            arg_name = arg_names[i]
             arg_value = args[i]
-            arg_value.set_context(new_context)
-            new_context.symbol_table.set(arg_name, arg_value)
+            arg_value.set_context(exec_ctx)
+            exec_ctx.symbol_table.set(arg_name, arg_value)
+
+    def check_and_populate_args(self, arg_names, args, exec_ctx ):
+        res = RTResult()
+        res.register(self.check_args(arg_names, args, exec_ctx))
+        if res.error: return res
+        res.register(self.populate_args(arg_names, args, exec_ctx))
+        if self.error: return res
+
+        return res.success(None)
+
+
+
+class Function(Value):
+    def __init__(self, name, body_node, arg_names):
+        super().__init__(name)
+        self.body_node = body_node
+        self.arg_names = arg_names
+
+    def execute(self, args):
+        res = RTResult()
+        interpreter = Interpreter()
+        exec_ctx = self.generate_new_context()
+
+        res.register(self.check_args(self.arg_names, args, exec_ctx))
+        res.register(self.populate_args(self.arg_names, args, exec_ctx))
 
         value = res.register(interpreter.visit(self.body_node, new_context))
         if res.error:
@@ -1711,9 +1742,9 @@ class Interpreter:
 
 
 global_symbol_table = SymbolTable()
-global_symbol_table.set("NULL", Number(0))
-global_symbol_table.set("FALSE", Number(0))
-global_symbol_table.set("TRUE", Number(1))
+global_symbol_table.set("NULL", Number.null)
+global_symbol_table.set("FALSE", Number.false)
+global_symbol_table.set("TRUE", Number.true)
 
 
 def run(fn, text):
