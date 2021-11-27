@@ -7,7 +7,7 @@ while True:
     result, error = midgy.run('<stdin>',text)
 
     if error: print(error.as_string())
-    elif result: print(result)
+    elif result: print(repr(result))
 
 # import comparison
 # while True:
